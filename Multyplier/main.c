@@ -1,17 +1,10 @@
 #include "mpi.h"
 #include "serv_func.h"
 
-#ifdef _DEBUG
-	#define i1 19
-	#define j1 15 	
-	#define i2 15 
-	#define j2 20
-#else
-	#define i1 240
-	#define j1 56
-	#define i2 56
-	#define j2 333
-#endif
+#define i1 240
+#define j1 56
+#define i2 56
+#define j2 333
 
 #define PROC_NUM 8
 #define STR_BUFFER_SIZE 100
@@ -92,7 +85,7 @@ int main(int argc, char* argv[])
 
 			//send procc#1 bi column
 			for (int j = 0; j < j2; j++)
-				MPI_Rsend(&B[0][j], 1, matrix_column, find_next_el(PROC_ORDER, 0, PROC_NUM + 1), B_MATRIX_COLUMN_TAG, MPI_COMM_WORLD);
+				MPI_Send(&B[0][j], 1, matrix_column, find_next_el(PROC_ORDER, 0, PROC_NUM + 1), B_MATRIX_COLUMN_TAG, MPI_COMM_WORLD);
 
 
 			//calculate receives count: if A sent rows count a_s less then proc nums - than receives only a_s 
@@ -101,11 +94,6 @@ int main(int argc, char* argv[])
 			current_proc = find_next_el(PROC_ORDER, 0, PROC_NUM + 1);
 			for (int k = 0; k < it_count; k++)
 			{	
-				/*if ( i1 - i <= PROC_NUM)
-				{
-					printf("We've got here!Env vars: it_count = %d, k = %d, current_proc = %d\n", it_count, k, current_proc);
-					fflush(stdout);
-				}*/
 				for (int j = 0; j < j2; j++)
 				{	
 					if (i + k < i1)
@@ -115,9 +103,6 @@ int main(int argc, char* argv[])
 				}
 				current_proc = find_next_el(PROC_ORDER, current_proc, PROC_NUM + 1);
 			}
-
-			printf("Successfully received all C el for iteration#%d\n", i/8 + 1);
-			fflush(stdout);
 		}
 
 
