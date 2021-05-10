@@ -78,6 +78,9 @@ int **aloc_con_matrix(int rows, int columns)
 	return arr_ptr;
 }
 
+
+
+
 int find_next_el(int *arr_ptr, int el, int n) 
 {
 	int el_id = -1;
@@ -103,6 +106,7 @@ int find_priv_el(int *arr_ptr, int el, int n)
 
 	return arr_ptr[el_id - 1];
 }
+
 
 void free_matrix(int** arr_ptr, int rows, int columns) 
 {

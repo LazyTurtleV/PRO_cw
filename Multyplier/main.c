@@ -14,18 +14,17 @@
 #endif
 
 #define PROC_NUM 8
+#define STR_BUFFER_SIZE 100
 
 #define A_MATRIX_ROW_TAG 1
 #define B_MATRIX_COLUMN_TAG 2
-#define C_MATRIX_EL_TAG	3
 #define PROC_DATA_TRANSFER_TAG 3
-#define BUFFER_SIZE 100
 
 int main(int argc, char* argv[])
 {
 	int ProcNum, ProcRank, RecvRank;
 	MPI_Datatype matrix_row, matrix_column;
-	const char FILE_PATH[] = "C:\\Users\\Volodya\\Desktop\\";
+	const char FILE_PATH[] = "H:\\Studing\\University\\PRO\\RGR\\Multyplier\\Debug\\";
 
 	const int PROC_ORDER[PROC_NUM + 1] = {0, 1, 8, 7, 3, 2, 5, 6, 4}; //0 - I\O processor
 
@@ -37,7 +36,7 @@ int main(int argc, char* argv[])
 	if (ProcRank == 0)	
 	{
 		//is used for operations with string
-		char buffer[BUFFER_SIZE];
+		char buffer[STR_BUFFER_SIZE];
 		input_type type;
 		
 		printf("Please, enter input mode:\nM - manual; F - from file; R - with random numbers.\n");
@@ -57,9 +56,9 @@ int main(int argc, char* argv[])
 		}
 
 		if(type == MANUAL) printf("Matrix A: \n");
-		int **A = input_matrix(i1, j1, type, concat_str(FILE_PATH, "A.dat", buffer, BUFFER_SIZE));
+		int **A = input_matrix(i1, j1, type, concat_str(FILE_PATH, "A.dat", buffer, STR_BUFFER_SIZE));
 		if(type == MANUAL) printf("Matrix B: \n");
-		int **B = input_matrix(i2, j2, type, concat_str(FILE_PATH, "B.dat", buffer, BUFFER_SIZE));
+		int **B = input_matrix(i2, j2, type, concat_str(FILE_PATH, "B.dat", buffer, STR_BUFFER_SIZE));
 		int **C = aloc_con_matrix(i1, j2);
 
 		printf("Calculating...\n");
@@ -72,26 +71,60 @@ int main(int argc, char* argv[])
 		MPI_Type_vector(i2, 1, j2, MPI_INT, &matrix_column);
 		MPI_Type_commit(&matrix_column);
 		
-		for (int i = 0; i < i1; i++) 
-		{
-			for (int j = 1; j < ProcNum; j++)
-				MPI_Send(&A[i][0], 1, matrix_row, j, A_MATRIX_ROW_TAG, MPI_COMM_WORLD);
-
-			for (int k = 0; k < j2; k++)
+		for (int i = 0; i < i1; i += PROC_NUM) 
+		{	
+			//send A's rows to all processes
+			int current_proc = find_next_el(PROC_ORDER, 0, PROC_NUM + 1);
+			for (int j = 0; j < PROC_NUM; j++)
 			{
-				MPI_Send(&B[0][k], 1, matrix_column, 1, B_MATRIX_COLUMN_TAG, MPI_COMM_WORLD);
-
-				//for (int g = 0; g < ProcNum; g++) 
-				//{
-					MPI_Recv(&C[i][k], 1, MPI_INT, MPI_ANY_SOURCE, C_MATRIX_EL_TAG, MPI_COMM_WORLD, MPI_STATUSES_IGNORE);
-				//}
+				if (i + j < i1)
+				{
+					MPI_Rsend(&A[i + j][0], 1, matrix_row, current_proc, A_MATRIX_ROW_TAG, MPI_COMM_WORLD);
+				}
+				else
+					//send some garbage to remaining processors
+				{
+					MPI_Rsend(&A[0][0], 1, matrix_row, current_proc, A_MATRIX_ROW_TAG, MPI_COMM_WORLD);
+				}
+				
+				current_proc = find_next_el(PROC_ORDER, current_proc, PROC_NUM + 1);
 			}
+
+			//send procc#1 bi column
+			for (int j = 0; j < j2; j++)
+				MPI_Rsend(&B[0][j], 1, matrix_column, find_next_el(PROC_ORDER, 0, PROC_NUM + 1), B_MATRIX_COLUMN_TAG, MPI_COMM_WORLD);
+
+
+			//calculate receives count: if A sent rows count a_s less then proc nums - than receives only a_s 
+			const int it_count = ((i1 - i) < PROC_NUM)? (i1 - i) : PROC_NUM;
+			//receive processors' responces
+			current_proc = find_next_el(PROC_ORDER, 0, PROC_NUM + 1);
+			for (int k = 0; k < it_count; k++)
+			{	
+				/*if ( i1 - i <= PROC_NUM)
+				{
+					printf("We've got here!Env vars: it_count = %d, k = %d, current_proc = %d\n", it_count, k, current_proc);
+					fflush(stdout);
+				}*/
+				for (int j = 0; j < j2; j++)
+				{	
+					if (i + k < i1)
+					{
+						MPI_Recv(&C[i + k][j], 1, MPI_INT, current_proc, j, MPI_COMM_WORLD, MPI_STATUSES_IGNORE);
+					}
+				}
+				current_proc = find_next_el(PROC_ORDER, current_proc, PROC_NUM + 1);
+			}
+
+			printf("Successfully received all C el for iteration#%d\n", i/8 + 1);
+			fflush(stdout);
 		}
 
-		//write C matrix
+
+		//write C matrix to file
 		FILE *res_out_file = NULL;
 		errno_t err;
-		if ((err = fopen_s(&res_out_file, concat_str(FILE_PATH, "C.dat", buffer, BUFFER_SIZE), "w")) != 0)
+		if ((err = fopen_s(&res_out_file, concat_str(FILE_PATH, "C.dat", buffer, STR_BUFFER_SIZE), "w")) != 0)
 			printf("Err #%d.\nFailed to open file for writing C.\n", err);
 		else 
 		{
@@ -99,40 +132,43 @@ int main(int argc, char* argv[])
 			fclose(res_out_file);
 		}
 
-		printf("Done!");
+		printf("Done!\n");
 		fflush(stdout);
-
-		free_matrix(A, i1, j1);
-		free_matrix(B, i2, j2);
-		free_matrix(C, i1, j2);
 	}
 	else 
 	{
 		int *A = calloc(j1, sizeof(int)), *B = calloc(j1, sizeof(int));
-
-		for (int j = 0; j < i1; j++) 
+		
+		for (int j = 0; j < (int)ceil((double)i1 / PROC_NUM); j++) 
 		{
-			MPI_Recv(A, j1, MPI_INT, 0, A_MATRIX_ROW_TAG, MPI_COMM_WORLD, MPI_STATUSES_IGNORE);
+			if (ProcRank == 7 && j == (int)ceil((double)i1 / PROC_NUM) - 1)
+			{
+				printf("Receiving A row...\n");
+				fflush(stdout);
+			}
 
+			MPI_Recv(A, j1, MPI_INT, 0, A_MATRIX_ROW_TAG, MPI_COMM_WORLD, MPI_STATUSES_IGNORE);
+			
+			if (ProcRank == 7 && j == (int)ceil((double)i1 / PROC_NUM) - 1)
+			{
+				printf("Recieved A row!\n");
+				fflush(stdout);
+			}
 			for (int k = 0; k < j2; k++) 
 			{
-				int C = 0;
-
 				MPI_Recv(B, j1, MPI_INT, find_priv_el(PROC_ORDER, ProcRank, PROC_NUM + 1), B_MATRIX_COLUMN_TAG, MPI_COMM_WORLD, MPI_STATUSES_IGNORE);
 
-				for (int i = 0; i < j1; i++) C += A[i]*B[i];
+				int C = 0;
+				for (int i = 0; i < j1; i++) 
+					C += A[i]*B[i];
 
-				MPI_Send(&C, 1, MPI_INT, 0, C_MATRIX_EL_TAG, MPI_COMM_WORLD);
+				MPI_Send(&C, 1, MPI_INT, 0, k, MPI_COMM_WORLD);
 				
 				//last process doesn't trunsfer its B column anywhere
 				if (ProcRank != PROC_ORDER[PROC_NUM])
 					MPI_Send(B, j1, MPI_INT, find_next_el(PROC_ORDER, ProcRank, PROC_NUM + 1), B_MATRIX_COLUMN_TAG, MPI_COMM_WORLD);
 			}
-
 		}
-
-		free(A);
-		free(B);
 	}
 
 	MPI_Finalize();
