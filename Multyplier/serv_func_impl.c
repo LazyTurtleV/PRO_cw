@@ -1,9 +1,9 @@
 #include "serv_func.h"
 
 
-int **input_matrix(int rows, int columns, input_type in_type, char *file_name)
+__calc_type **input_matrix(int rows, int columns, input_type in_type, char *file_name)
 {
-	int** arr_ptr = aloc_con_matrix(rows, columns);
+	__calc_type **arr_ptr = aloc_con_matrix(rows, columns);
 	FILE *output_file;
 
 	switch (in_type)
@@ -16,19 +16,25 @@ int **input_matrix(int rows, int columns, input_type in_type, char *file_name)
 				printf("Enter element a%d%d\n", i, j);
 				fflush(stdout);
 
-				scanf_s("%d", &arr_ptr[i][j]);
+				scanf_s("%I64d", &arr_ptr[i][j]);
 			}
 		}
 
 		break;
-	case RANDOM:
-		for (int i = 0; i < rows; i++) 
+	case RANDOM: {
+		__calc_type _rand_start = 0, _rand_end = 0;
+		printf("Please, enter rand_start and rand_end with space between:\n");
+		fflush(stdout);
+		scanf_s("%I64d %I64d", &_rand_start, &_rand_end);
+
+		for (int i = 0; i < rows; i++)
 		{
 			for (int j = 0; j < columns; j++)
-				arr_ptr[i][j] = rand() % 10;
+				arr_ptr[i][j] = _rand_start + rand() % (_rand_end - _rand_start);
 		}
 
 		break;
+	}
 	case FROM_FILE:;
 		FILE *input_file = NULL;
 		
@@ -42,7 +48,7 @@ int **input_matrix(int rows, int columns, input_type in_type, char *file_name)
 		{
 			for (int j = 0; j < columns; j++)
 			{
-				fscanf_s(input_file, "%d", &arr_ptr[i][j]);
+				fscanf_s(input_file, "%I64d", &arr_ptr[i][j]);
 			}
 		}
 
@@ -65,10 +71,10 @@ int **input_matrix(int rows, int columns, input_type in_type, char *file_name)
 }
 
 //creates continuous in mem 2D dim matrix
-int **aloc_con_matrix(int rows, int columns)
+__calc_type **aloc_con_matrix(int rows, int columns)
 {
-	int** arr_ptr = calloc(rows, sizeof(int*));
-	arr_ptr[0] = calloc(rows * columns, sizeof(int));
+	__calc_type **arr_ptr = calloc(rows, sizeof(__calc_type*));
+	arr_ptr[0] = calloc(rows * columns, sizeof(__calc_type));
 
 	for (int i = 1; i < rows; i++) 
 	{
@@ -81,7 +87,7 @@ int **aloc_con_matrix(int rows, int columns)
 
 
 
-int find_next_el(int *arr_ptr, int el, int n) 
+int find_next_el(int *arr_ptr, int el, int n)
 {
 	int el_id = -1;
 	
@@ -108,17 +114,17 @@ int find_priv_el(int *arr_ptr, int el, int n)
 }
 
 
-void free_matrix(int** arr_ptr, int rows, int columns) 
+void free_matrix(__calc_type **arr_ptr, int rows, int columns)
 {
 	free(arr_ptr[0]);
 	free(arr_ptr);
 }
 
-void print_matrix(int **arr_ptr, int rows, int columns, FILE *out_str) 
+void print_matrix(__calc_type **arr_ptr, int rows, int columns, FILE *out_str)
 {
 	for (int i = 0; i < rows; i++) {
 		for (int j = 0; j < columns; j++) {
-			char *delim = j == columns - 1 ? "%d" : "%d\t";
+			char *delim = j == columns - 1 ? "%I64d" : "%I64d\t";
 			fprintf(out_str, delim, arr_ptr[i][j]);
 		}
 		fputc('\n', out_str);
@@ -127,10 +133,10 @@ void print_matrix(int **arr_ptr, int rows, int columns, FILE *out_str)
 	fflush(out_str);
 }
 
-void print_vector(int* arr_ptr, int lenght) 
+void print_vector(__calc_type *arr_ptr, int lenght)
 {
 	for (int i = 0; i < lenght; i++)
-		printf("%d\t", arr_ptr[i]);
+		printf("%I64d\t", arr_ptr[i]);
 	printf("\n");
 	fflush(stdout);
 }

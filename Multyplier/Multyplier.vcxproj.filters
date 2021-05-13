@@ -21,6 +21,9 @@
     <ClCompile Include="serv_func_impl.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="thread_routine.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="serv_func.h">
